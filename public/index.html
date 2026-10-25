@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Connect 4 Live — Realtime Multiplayer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Confetti and QR Code libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="app-container">
+
+    <!-- TOP HEADER -->
+    <header class="main-header">
+      <div class="logo">
+        <span class="logo-disc red-disc"></span>
+        <span class="logo-disc yellow-disc"></span>
+        <h1>CONNECT<span class="highlight">4</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="soundToggleBtn" class="icon-btn" title="Toggle Sound" aria-label="Toggle Sound">
+          <svg id="soundOnIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="soundOffIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="hidden">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- VIEW 1: LOBBY VIEW -->
+    <main id="lobbyView" class="view-panel active">
+      <div class="lobby-card glass-panel">
+        <div class="card-hero">
+          <h2>Play Cross-Device</h2>
+          <p>Challenge a friend in real time. Works on phones, tablets, and computers anywhere in the world.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="playerNameInput">Your Name</label>
+          <input type="text" id="playerNameInput" placeholder="Enter your player name" maxlength="15" autocomplete="off" value="Player">
+        </div>
+
+        <div class="action-grid">
+          <div class="action-box">
+            <h3>Start New Game</h3>
+            <p>Create a private room and get an invite link or QR code.</p>
+            <button id="createRoomBtn" class="btn btn-primary btn-glow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+              Create Game Room
+            </button>
+          </div>
+
+          <div class="divider"><span>OR</span></div>
+
+          <div class="action-box">
+            <h3>Join Existing Game</h3>
+            <p>Enter the 4-letter room code shared by your friend.</p>
+            <div class="join-row">
+              <input type="text" id="joinCodeInput" placeholder="CODE" maxlength="4" uppercase class="code-input">
+              <button id="joinRoomBtn" class="btn btn-secondary">Join</button>
+            </div>
+            <div id="joinErrorMsg" class="error-text hidden"></div>
+          </div>
+        </div>
+
+        <!-- Rules reminder -->
+        <div class="rules-summary">
+          <div class="rule-item">
+            <span class="rule-icon">🎯</span>
+            <span>Take turns dropping chips into 7 columns</span>
+          </div>
+          <div class="rule-item">
+            <span class="rule-icon">⚡</span>
+            <span>Chips fall to the bottom of the column</span>
+          </div>
+          <div class="rule-item">
+            <span class="rule-icon">🏆</span>
+            <span>First to connect 4 in any direction wins!</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- VIEW 2: GAME ROOM VIEW -->
+    <main id="gameView" class="view-panel">
+      <!-- Top Room Bar -->
+      <div class="room-bar glass-panel">
+        <div class="room-code-tag">
+          <span class="tag-label">ROOM</span>
+          <span id="roomCodeDisplay" class="tag-code">----</span>
+        </div>
+
+        <div class="room-controls">
+          <button id="copyLinkBtn" class="btn-sm btn-outline" title="Copy Invite Link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span id="copyLinkText">Invite Link</span>
+          </button>
+          <button id="showQrBtn" class="btn-sm btn-outline" title="Show QR Code for Mobile">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>QR Code</span>
+          </button>
+          <button id="leaveRoomBtn" class="btn-sm btn-danger-outline" title="Leave Match">
+            Exit
+          </button>
+        </div>
+      </div>
+
+      <!-- Scoreboard & Players -->
+      <div class="scoreboard-container">
+        <!-- Player 1 (Red) -->
+        <div id="p1Card" class="player-card red-theme">
+          <div class="player-avatar">
+            <div class="disc-avatar red"></div>
+          </div>
+          <div class="player-details">
+            <span id="p1Name" class="player-name">Player 1</span>
+            <span id="p1Status" class="player-badge">Waiting</span>
+          </div>
+          <div id="p1Score" class="player-score">0</div>
+        </div>
+
+        <div class="versus-tag">VS</div>
+
+        <!-- Player 2 (Yellow) -->
+        <div id="p2Card" class="player-card yellow-theme">
+          <div class="player-avatar">
+            <div class="disc-avatar yellow"></div>
+          </div>
+          <div class="player-details">
+            <span id="p2Name" class="player-name">Waiting...</span>
+            <span id="p2Status" class="player-badge">Empty</span>
+          </div>
+          <div id="p2Score" class="player-score">0</div>
+        </div>
+      </div>
+
+      <!-- Status Announcement Banner -->
+      <div id="gameStatusBanner" class="status-banner info">
+        <span id="statusText">Waiting for opponent to join...</span>
+      </div>
+
+      <!-- Connect 4 Board Container -->
+      <div class="board-wrapper">
+        <!-- Hover / Tap Ghost Drop Row -->
+        <div id="dropZoneRow" class="drop-zone-row">
+          <button class="drop-col-btn" data-col="0" aria-label="Drop chip in column 1"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="1" aria-label="Drop chip in column 2"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="2" aria-label="Drop chip in column 3"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="3" aria-label="Drop chip in column 4"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="4" aria-label="Drop chip in column 5"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="5" aria-label="Drop chip in column 6"><div class="ghost-chip"></div></button>
+          <button class="drop-col-btn" data-col="6" aria-label="Drop chip in column 7"><div class="ghost-chip"></div></button>
+        </div>
+
+        <!-- The 7x6 Grid -->
+        <div class="board-frame">
+          <div id="connect4Grid" class="board-grid">
+            <!-- 42 slots generated dynamically by game.js -->
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Game Action Bar -->
+      <div class="game-footer">
+        <div id="spectatorNotice" class="spectator-tag hidden">
+          👁️ Spectating match
+        </div>
+        <button id="rematchBtn" class="btn btn-primary btn-glow hidden">
+          Play Again 🔄
+        </button>
+        <span id="rematchStatus" class="rematch-status-text"></span>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- QR CODE MODAL FOR MOBILE SCANNING -->
+  <div id="qrModal" class="modal-overlay hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <h3>Join on Mobile</h3>
+        <button id="closeQrBtn" class="close-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <p class="modal-sub">Scan this QR code with your phone camera to instantly jump into the game!</p>
+      <div class="wifi-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+        <span>Connect phone to the same Wi-Fi as your PC</span>
+      </div>
+      <div id="qrCodeContainer" class="qr-container"></div>
+      <div class="modal-url-box">
+        <input type="text" id="shareUrlInput" readonly>
+        <button id="copyModalUrlBtn" class="btn-sm btn-primary">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="game.js"></script>
+</body>
+</html>
